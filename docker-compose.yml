@@ -1,0 +1,48 @@
+version: "3.7"
+services:
+  gluetun:
+    # https://github.com/qdm12/gluetun
+    image: ghcr.io/qdm12/gluetun:latest
+    container_name: gluetun
+    # line above must be uncommented to allow external containers to connect. See https://github.com/qdm12/gluetun/wiki/Connect-a-container-to-gluetun#external-container-to-gluetun
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./gluetun:/gluetun
+    environment:
+      # See https://github.com/qdm12/gluetun/wiki
+      ## ProtonVPN Wireguard
+      - VPN_SERVICE_PROVIDER=custom
+      - VPN_TYPE=wireguard
+      - VPN_ENDPOINT_IP=<VPN_ENDPOINT_IP>
+      - VPN_ENDPOINT_PORT=51820
+      - WIREGUARD_PUBLIC_KEY=<WIREGUARD_PUBLIC_KEY>
+      - WIREGUARD_PRIVATE_KEY=<WIREGUARD_PRIVATE_KEY>
+      - WIREGUARD_ADDRESSES=10.2.0.2/32
+      # Timezone for accurate log times
+      - TZ=Europe/Oslo
+      # Server list updater. See https://github.com/qdm12/gluetun/wiki/Updating-Servers#periodic-update
+      - UPDATER_PERIOD=24h
+      # - UPDATER_VPN_SERVICE_PROVIDERS=
+    ports:
+      # qBittorrent allow local web UI
+      # - 8080:8080/tcp # qBittorrent
+
+
+  natpmpc:
+    build: ./
+    container_name: natpmpc
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CHECK_INTERVAL=300
+      - VPN_GATEWAY=10.2.0.1
+      - VPN_CONTAINER_NAME=gluetun
+      - VPN_INTERFACE_NAME=tun0
+    network_mode: "service:gluetun"
